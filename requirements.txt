@@ -1,0 +1,17 @@
+# Framework web
+Flask==3.1.0
+Flask-Login==0.6.3
+Flask-WTF==1.2.2
+Flask-SQLAlchemy==3.1.1
+
+# Base de données
+psycopg2-binary==2.9.9
+Flask-Migrate==4.0.7
+
+# Sécurité & MFA
+Werkzeug==3.1.3         # hash des mots de passe
+pyotp==2.9.0            # génération codes TOTP
+qrcode[pil]==8.0        # génération QR code d'enrôlement
+
+# Utilitaires
+python-dotenv==1.0.1    # lecture du .env

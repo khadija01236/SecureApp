@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+
+  # ── Application Flask ──────────────────────────────────────────────
+  web:
+    build: .
+    container_name: flask_app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://flask_user:flask_pass@db:5432/flask_mfa_db
+    volumes:
+      - .:/app              # hot reload en dev
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  # ── Base de données PostgreSQL ─────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: flask_user
+      POSTGRES_PASSWORD: flask_pass
+      POSTGRES_DB: flask_mfa_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"          # exposé pour debug local (désactiver en prod)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flask_user -d flask_mfa_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+volumes:
+  postgres_data:
+
+networks:
+  app_network:
+    driver: bridge
