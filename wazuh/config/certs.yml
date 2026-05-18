@@ -1,0 +1,15 @@
+nodes:
+  # Nœud OpenSearch (indexer)
+  indexer:
+    - name: wazuh-indexer
+      ip: wazuh-indexer
+
+  # Manager Wazuh (filebeat interne)
+  server:
+    - name: wazuh-manager
+      ip: wazuh-manager
+
+  # Dashboard
+  dashboard:
+    - name: wazuh-dashboard
+      ip: wazuh-dashboard

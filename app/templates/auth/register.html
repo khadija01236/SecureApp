@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Inscription — SecureApp{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="card mt-5">
+      <div class="card-body p-4">
+        <h2 class="card-title text-center mb-4">
+          <i class="bi bi-person-plus-fill text-success me-2"></i>Créer un compte
+        </h2>
+        <form method="POST" action="{{ url_for('auth.register') }}">
+          <div class="mb-3">
+            <label for="username" class="form-label">Nom d'utilisateur</label>
+            <input
+              type="text"
+              class="form-control"
+              id="username"
+              name="username"
+              required
+              autofocus
+              autocomplete="username"
+              minlength="3"
+              maxlength="64"
+            />
+          </div>
+          <div class="mb-3">
+            <label for="email" class="form-label">Adresse email</label>
+            <input
+              type="email"
+              class="form-control"
+              id="email"
+              name="email"
+              required
+              autocomplete="email"
+            />
+          </div>
+          <div class="mb-3">
+            <label for="password" class="form-label">Mot de passe</label>
+            <input
+              type="password"
+              class="form-control"
+              id="password"
+              name="password"
+              required
+              autocomplete="new-password"
+              minlength="8"
+            />
+            <div class="form-text">8 caractères minimum.</div>
+          </div>
+          <div class="mb-4">
+            <label for="confirm_password" class="form-label">Confirmer le mot de passe</label>
+            <input
+              type="password"
+              class="form-control"
+              id="confirm_password"
+              name="confirm_password"
+              required
+              autocomplete="new-password"
+            />
+          </div>
+          <div class="d-grid">
+            <button type="submit" class="btn btn-success btn-lg">
+              <i class="bi bi-check-circle me-2"></i>Créer mon compte
+            </button>
+          </div>
+        </form>
+        <hr />
+        <p class="text-center mb-0">
+          Déjà un compte ? <a href="{{ url_for('auth.login') }}">Se connecter</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

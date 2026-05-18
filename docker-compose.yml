@@ -2,13 +2,34 @@ version: "3.9"
 
 services:
 
-  # ── Application Flask ──────────────────────────────────────────────
+  # ── Reverse proxy Nginx (HTTPS) ────────────────────────────────────────
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: nginx_proxy
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+      - "443:443"
+    volumes:
+      - nginx_logs:/var/log/nginx
+      - nginx_blocked_ips:/etc/nginx/wazuh
+    depends_on:
+      - web
+    networks:
+      - app_network
+
+  # ── Application Flask ──────────────────────────────────────────────────
   web:
     build: .
     container_name: flask_app
     restart: unless-stopped
-    ports:
-      - "5000:5000"
+    # Port 5000 non exposé à l'hôte — accessible uniquement via Nginx
+    expose:
+      - "5000"
+    # Hot-reload en dev (override du CMD Gunicorn — l'entrypoint tourne quand même)
+    command: flask --app app run --host=0.0.0.0 --port=5000 --debug
     env_file:
       - .env
     environment:
@@ -16,13 +37,16 @@ services:
       - DATABASE_URL=postgresql://flask_user:flask_pass@db:5432/flask_mfa_db
     volumes:
       - .:/app              # hot reload en dev
+      - flask_logs:/var/log/flask
     depends_on:
       db:
         condition: service_healthy
+      mailhog:
+        condition: service_started
     networks:
       - app_network
 
-  # ── Base de données PostgreSQL ─────────────────────────────────────
+  # ── Base de données PostgreSQL ─────────────────────────────────────────
   db:
     image: postgres:16-alpine
     container_name: postgres_db
@@ -43,9 +67,30 @@ services:
     networks:
       - app_network
 
+  # ── Serveur SMTP de développement ─────────────────────────────────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"        # SMTP
+      - "8025:8025"        # Interface web
+    networks:
+      - app_network
+
 volumes:
   postgres_data:
+  # Noms explicites pour que le compose Wazuh puisse les référencer en external
+  flask_logs:
+    name: flask_logs
+  nginx_logs:
+    name: nginx_logs
+  # Volume partagé Wazuh ↔ Nginx pour le blocage dynamique d'IPs
+  nginx_blocked_ips:
+    name: nginx_blocked_ips
 
 networks:
   app_network:
     driver: bridge
+    # Nom explicite pour que le compose Wazuh puisse le référencer en external
+    name: secureapp_network

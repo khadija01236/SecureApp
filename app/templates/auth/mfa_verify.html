@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Vérification MFA — SecureApp{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="card mt-5">
+      <div class="card-body p-4">
+        <h2 class="card-title text-center mb-1">
+          <i class="bi bi-shield-check text-warning me-2"></i>Vérification en 2 étapes
+        </h2>
+        <p class="text-center text-muted mb-4">Saisis le code pour finaliser ta connexion.</p>
+
+        <!-- Onglets selon les méthodes disponibles -->
+        <ul class="nav nav-tabs mb-3" id="mfaTabs" role="tablist">
+          {% if totp_enabled %}
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="totp-tab" data-bs-toggle="tab" data-bs-target="#totp-pane"
+              type="button" role="tab">
+              <i class="bi bi-phone me-1"></i>Application
+            </button>
+          </li>
+          {% endif %}
+          {% if email_otp_enabled %}
+          <li class="nav-item" role="presentation">
+            <button class="nav-link {% if not totp_enabled %}active{% endif %}" id="email-tab"
+              data-bs-toggle="tab" data-bs-target="#email-pane" type="button" role="tab">
+              <i class="bi bi-envelope me-1"></i>Email
+            </button>
+          </li>
+          {% endif %}
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="backup-tab" data-bs-toggle="tab" data-bs-target="#backup-pane"
+              type="button" role="tab">
+              <i class="bi bi-key me-1"></i>Code de secours
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content" id="mfaTabContent">
+          <!-- TOTP -->
+          {% if totp_enabled %}
+          <div class="tab-pane fade show active" id="totp-pane" role="tabpanel">
+            <p class="text-muted small">
+              Ouvre ton application (Google Authenticator, Authy…) et saisis le code à 6 chiffres.
+            </p>
+            <form method="POST" action="{{ url_for('auth.mfa_verify') }}">
+              <input type="hidden" name="method" value="totp" />
+              <div class="mb-3">
+                <label for="code-totp" class="form-label">Code TOTP</label>
+                <input
+                  type="text"
+                  class="form-control form-control-lg text-center"
+                  id="code-totp"
+                  name="code"
+                  maxlength="6"
+                  pattern="\d{6}"
+                  placeholder="000000"
+                  autofocus
+                  autocomplete="one-time-code"
+                  required
+                />
+              </div>
+              <div class="d-grid">
+                <button type="submit" class="btn btn-warning btn-lg">
+                  <i class="bi bi-arrow-right-circle me-2"></i>Vérifier
+                </button>
+              </div>
+            </form>
+          </div>
+          {% endif %}
+
+          <!-- Email OTP -->
+          {% if email_otp_enabled %}
+          <div class="tab-pane fade {% if not totp_enabled %}show active{% endif %}" id="email-pane" role="tabpanel">
+            <p class="text-muted small">
+              Un code a été envoyé à <strong>{{ email }}</strong>. Valable 10 minutes.
+            </p>
+            <form method="POST" action="{{ url_for('auth.mfa_verify') }}">
+              <input type="hidden" name="method" value="email" />
+              <div class="mb-3">
+                <label for="code-email" class="form-label">Code reçu par email</label>
+                <input
+                  type="text"
+                  class="form-control form-control-lg text-center"
+                  id="code-email"
+                  name="code"
+                  maxlength="6"
+                  pattern="\d{6}"
+                  placeholder="000000"
+                  autocomplete="one-time-code"
+                  required
+                />
+              </div>
+              <div class="d-grid mb-2">
+                <button type="submit" class="btn btn-warning btn-lg">
+                  <i class="bi bi-arrow-right-circle me-2"></i>Vérifier
+                </button>
+              </div>
+            </form>
+            <form method="POST" action="{{ url_for('auth.mfa_email_send') }}">
+              <div class="d-grid">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-envelope-arrow-up me-1"></i>Renvoyer le code
+                </button>
+              </div>
+            </form>
+          </div>
+          {% endif %}
+
+          <!-- Backup code -->
+          <div class="tab-pane fade" id="backup-pane" role="tabpanel">
+            <p class="text-muted small">Utilise l'un de tes codes de récupération à usage unique.</p>
+            <form method="POST" action="{{ url_for('auth.mfa_verify') }}">
+              <input type="hidden" name="method" value="backup" />
+              <div class="mb-3">
+                <label for="code-backup" class="form-label">Code de secours</label>
+                <input
+                  type="text"
+                  class="form-control form-control-lg text-center text-uppercase"
+                  id="code-backup"
+                  name="code"
+                  maxlength="8"
+                  placeholder="XXXXXXXX"
+                  autocomplete="off"
+                  required
+                />
+              </div>
+              <div class="d-grid">
+                <button type="submit" class="btn btn-outline-danger btn-lg">
+                  <i class="bi bi-key-fill me-2"></i>Utiliser ce code
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <hr class="mt-4" />
+        <p class="text-center mb-0">
+          <a href="{{ url_for('auth.login') }}" class="text-muted small">
+            <i class="bi bi-arrow-left me-1"></i>Retour à la connexion
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

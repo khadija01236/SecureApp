@@ -1,0 +1,176 @@
+version: "3.9"
+
+# =============================================================================
+# Stack SIEM Wazuh — Single Node
+# Prérequis : exécuter wazuh/setup.sh une première fois pour générer les certs
+# =============================================================================
+
+services:
+
+  # ── Wazuh Manager ──────────────────────────────────────────────────────────
+  # Cerveau du SIEM : collecte les logs, applique les règles, génère les alertes
+  wazuh-manager:
+    image: wazuh/wazuh-manager:4.9.2
+    container_name: wazuh-manager
+    hostname: wazuh-manager
+    restart: unless-stopped
+    # NET_ADMIN : requis pour que firewall-drop (iptables) fonctionne
+    cap_add:
+      - NET_ADMIN
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 655360
+        hard: 655360
+    ports:
+      - "1514:1514"        # Communication agents
+      - "1515:1515"        # Enrollment agents
+      - "514:514/udp"      # Syslog entrant
+      - "55000:55000"      # API REST Wazuh
+    environment:
+      - INDEXER_URL=https://wazuh-indexer:9200
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=SecretPassword
+      - FILEBEAT_SSL_VERIFICATION_MODE=full
+      - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
+      - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
+      - SSL_KEY=/etc/ssl/filebeat.key
+      - API_USERNAME=wazuh-wui
+      - API_PASSWORD=MyS3cr37P450r.*-
+    volumes:
+      # Données persistantes Wazuh
+      - wazuh_api_configuration:/var/ossec/api/configuration
+      - wazuh_etc:/var/ossec/etc
+      - wazuh_logs:/var/ossec/logs
+      - wazuh_queue:/var/ossec/queue
+      - wazuh_var_multigroups:/var/ossec/var/multigroups
+      - wazuh_integrations:/var/ossec/integrations
+      - wazuh_active_response:/var/ossec/active-response/bin
+      - wazuh_agentless:/var/ossec/agentless
+      - wazuh_wodles:/var/ossec/wodles
+      - filebeat_etc:/etc/filebeat
+      - filebeat_var:/var/lib/filebeat
+      # Certificats TLS (générés par setup.sh)
+      - ./certs/root-ca-manager.pem:/etc/ssl/root-ca.pem
+      - ./certs/wazuh-manager.pem:/etc/ssl/filebeat.pem
+      - ./certs/wazuh-manager-key.pem:/etc/ssl/filebeat.key
+      # Configuration custom (ossec.conf)
+      - ./config/ossec.conf:/wazuh-config-mount/etc/ossec.conf
+      # Règles et décodeurs custom
+      - ./rules/local_rules.xml:/var/ossec/etc/rules/local_rules.xml
+      - ./config/local_decoders.xml:/var/ossec/etc/decoders/local_decoder.xml
+      # Logs applicatifs Flask et Nginx (volumes partagés depuis compose principal)
+      - flask_logs:/var/log/flask:ro
+      - nginx_logs:/var/log/nginx:ro
+      # Script active response custom (nginx-block.sh)
+      - ./active-response/nginx-block.sh:/var/ossec/active-response/bin/nginx-block.sh
+      # Répertoire de deny list Nginx — partagé avec le conteneur Nginx
+      # Le script écrit dans /etc/nginx/wazuh/blocked_ips.conf
+      - nginx_blocked_ips:/etc/nginx/wazuh
+      # Socket Docker — permet à nginx-block.sh de recharger Nginx via SIGHUP
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - wazuh_network
+      - app_network
+
+  # ── Wazuh Indexer (OpenSearch) ─────────────────────────────────────────────
+  # Stocke les alertes et événements de sécurité
+  wazuh-indexer:
+    image: wazuh/wazuh-indexer:4.9.2
+    container_name: wazuh-indexer
+    hostname: wazuh-indexer
+    restart: unless-stopped
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
+    ports:
+      - "9200:9200"
+    volumes:
+      - wazuh_indexer_data:/var/lib/wazuh-indexer
+      # Certs sous /usr/share/wazuh-indexer/certs/ (chemin autorisé par Java SecurityManager)
+      - ./certs/root-ca.pem:/usr/share/wazuh-indexer/certs/root-ca.pem
+      - ./certs/wazuh-indexer-key.pem:/usr/share/wazuh-indexer/certs/wazuh-indexer.key
+      - ./certs/wazuh-indexer.pem:/usr/share/wazuh-indexer/certs/wazuh-indexer.pem
+      - ./certs/admin.pem:/usr/share/wazuh-indexer/certs/admin.pem
+      - ./certs/admin-key.pem:/usr/share/wazuh-indexer/certs/admin-key.pem
+      # Config opensearch.yml — chemin réel dans l'image
+      - ./config/wazuh_indexer.yml:/usr/share/wazuh-indexer/opensearch.yml
+    networks:
+      - wazuh_network
+
+  # ── Wazuh Dashboard ────────────────────────────────────────────────────────
+  # Interface web de visualisation (basée sur OpenSearch Dashboards)
+  wazuh-dashboard:
+    image: wazuh/wazuh-dashboard:4.9.2
+    container_name: wazuh-dashboard
+    hostname: wazuh-dashboard
+    restart: unless-stopped
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=https://wazuh-indexer:9200
+      - WAZUH_API_URL=https://wazuh-manager
+      - DASHBOARD_USERNAME=kibanaserver
+      - DASHBOARD_PASSWORD=kibanaserver
+      - API_USERNAME=wazuh-wui
+      - API_PASSWORD=MyS3cr37P450r.*-
+    volumes:
+      # Certificats TLS
+      - ./certs/wazuh-dashboard.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard.pem
+      - ./certs/wazuh-dashboard-key.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard.key
+      - ./certs/root-ca.pem:/usr/share/wazuh-dashboard/certs/root-ca.pem
+    depends_on:
+      - wazuh-indexer
+      - wazuh-manager
+    networks:
+      - wazuh_network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  # Volumes internes Wazuh manager
+  wazuh_api_configuration:
+  wazuh_etc:
+  wazuh_logs:
+  wazuh_queue:
+  wazuh_var_multigroups:
+  wazuh_integrations:
+  wazuh_active_response:
+  wazuh_agentless:
+  wazuh_wodles:
+  filebeat_etc:
+  filebeat_var:
+  # Indexer
+  wazuh_indexer_data:
+  # Volumes EXTERNES — créés par le docker-compose.yml principal
+  # Ces volumes contiennent les logs Flask et Nginx à analyser
+  flask_logs:
+    external: true
+  nginx_logs:
+    external: true
+  # Volume partagé Wazuh (écriture) ↔ Nginx (lecture) — créé par le compose principal
+  nginx_blocked_ips:
+    external: true
+    name: nginx_blocked_ips
+
+# =============================================================================
+# Réseaux
+# =============================================================================
+networks:
+  # Réseau interne Wazuh (manager ↔ indexer ↔ dashboard)
+  wazuh_network:
+    driver: bridge
+
+  # Réseau applicatif partagé avec le stack principal
+  app_network:
+    external: true
+    name: secureapp_network

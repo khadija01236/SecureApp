@@ -1,0 +1,222 @@
+<!--
+  ===========================================================================
+  Règles de détection custom — SecureApp SIEM
+  ===========================================================================
+
+  Les règles custom commencent à partir de l'ID 100000.
+
+  Niveaux Wazuh :
+    0  = ignoré
+    3  = info
+    5  = avertissement
+    7  = erreur / anomalie
+    9  = attaque probable
+    10 = attaque confirmée
+    12 = critique / haute sévérité
+
+  Champs JSON Flask disponibles (via log_format=json) :
+    data.event_type : login_fail | login_success | mfa_fail | mfa_success |
+                      account_locked | register | logout
+    data.user       : nom d'utilisateur
+    data.ip         : adresse IP source
+    data.details    : informations complémentaires
+
+  Champs JSON Nginx disponibles :
+    data.remote_addr : IP source
+    data.method      : méthode HTTP
+    data.uri         : chemin de la requête
+    data.status      : code HTTP
+  ===========================================================================
+-->
+
+<group name="secureapp,authentication,">
+
+  <!-- ======================================================================
+       RÈGLE PARENTE — Événement Flask détecté
+       Toutes les règles Flask héritent de celle-ci.
+  ======================================================================= -->
+  <rule id="100000" level="0">
+    <decoded_as>flask-secureapp</decoded_as>
+    <description>SecureApp Flask : événement d'authentification détecté</description>
+    <group>authentication</group>
+  </rule>
+
+  <!-- ======================================================================
+       RÈGLE 100001 — Échec de connexion (mot de passe incorrect)
+       Niveau 5 : anomalie, pas encore une attaque
+  ======================================================================= -->
+  <rule id="100001" level="5">
+    <if_sid>100000</if_sid>
+    <field name="data.event_type">login_fail</field>
+    <description>SecureApp : échec de connexion pour l'utilisateur $(data.user) depuis $(data.ip)</description>
+    <group>authentication_failed,pci_dss_10.2.4,gdpr_IV_35.7.d</group>
+  </rule>
+
+  <!-- ======================================================================
+       RÈGLE 100002 — Connexion réussie
+       Niveau 3 : info, utile pour l'audit
+  ======================================================================= -->
+  <rule id="100002" level="3">
+    <if_sid>100000</if_sid>
+    <field name="data.event_type">login_success</field>
+    <description>SecureApp : connexion réussie pour $(data.user) depuis $(data.ip)</description>
+    <group>authentication_success,pci_dss_10.2.5</group>
+  </rule>
+
+  <!-- ======================================================================
+       RÈGLE 100003 — BRUTE FORCE LOGIN
+       Déclenchée si la règle 100001 (login_fail) se produit
+       plus de 5 fois en 60 secondes depuis la même IP source.
+       Niveau 10 : attaque confirmée → active response déclenché
+  ======================================================================= -->
+  <rule id="100003" level="10" frequency="5" timeframe="60">
+    <if_matched_sid>100001</if_matched_sid>
+    <same-source-ip />
+    <description>SecureApp : BRUTE FORCE DÉTECTÉ — $(frequency) tentatives de connexion depuis $(data.ip) en 60s</description>
+    <group>authentication_failures,pci_dss_11.4,brute_force</group>
+    <mitre>
+      <id>T1110</id>  <!-- MITRE ATT&CK : Brute Force -->
+    </mitre>
+  </rule>
+
+  <!-- ======================================================================
+       RÈGLE 100004 — Échec de vérification MFA
+       Niveau 7 : erreur / suspect
+  ======================================================================= -->
+  <rule id="100004" level="7">
+    <if_sid>100000</if_sid>
+    <field name="data.event_type">mfa_fail</field>
+    <description>SecureApp : échec MFA pour $(data.user) depuis $(data.ip)</description>
+    <group>authentication_failed,mfa</group>
+  </rule>
+
+  <!-- ======================================================================
+       RÈGLE 100005 — MFA BYPASS ATTEMPT
+       Déclenchée si la règle 100004 (mfa_fail) se produit
+       plus de 3 fois en 5 minutes pour le même utilisateur.
+       Niveau 12 : critique → tentative de contournement du MFA
+  ======================================================================= -->
+  <rule id="100005" level="12" frequency="3" timeframe="300">
+    <if_matched_sid>100004</if_matched_sid>
+    <same-field name="data.user" />
+    <description>SecureApp : TENTATIVE DE BYPASS MFA — $(frequency) échecs pour $(data.user) en 5 min</description>
+    <group>authentication_failures,mfa_bypass</group>
+    <mitre>
+      <id>T1621</id>  <!-- MITRE ATT&CK : MFA Request Generation -->
+    </mitre>
+  </rule>
+
+  <!-- ======================================================================
+       RÈGLE 100006 — Compte verrouillé (lockout)
+       Niveau 9 : attaque probable (conséquence d'un brute force)
+  ======================================================================= -->
+  <rule id="100006" level="9">
+    <if_sid>100000</if_sid>
+    <field name="data.event_type">account_locked</field>
+    <description>SecureApp : compte $(data.user) verrouillé suite à trop de tentatives depuis $(data.ip)</description>
+    <group>account_lockout,pci_dss_8.1.6</group>
+  </rule>
+
+</group>
+
+
+<group name="secureapp,web,injection,">
+
+  <!-- ======================================================================
+       RÈGLE PARENTE — Requête Nginx détectée
+  ======================================================================= -->
+  <rule id="100010" level="0">
+    <decoded_as>nginx-secureapp</decoded_as>
+    <description>SecureApp Nginx : requête HTTP reçue</description>
+  </rule>
+
+  <!-- ======================================================================
+       RÈGLE 100011 — Détection SQLi (SQL Injection)
+       Pattern : mots-clés SQL dans l'URI de la requête Nginx
+       Niveau 9 : attaque probable
+  ======================================================================= -->
+  <rule id="100011" level="9">
+    <if_sid>100010</if_sid>
+    <url_match>(?i)(union\s+select|select\s+.*\s+from|insert\s+into|drop\s+table|--\s*$|;\s*drop|xp_cmdshell|exec\s*\(|%27|%22.*or|or\s+1=1|'or'1'='1)</url_match>
+    <description>SecureApp : TENTATIVE SQLi détectée depuis $(data.remote_addr) — URI : $(data.uri)</description>
+    <group>sql_injection,pci_dss_6.5.1,web_attack</group>
+    <mitre>
+      <id>T1190</id>  <!-- MITRE ATT&CK : Exploit Public-Facing Application -->
+    </mitre>
+  </rule>
+
+  <!-- ======================================================================
+       RÈGLE 100012 — Détection XSS (Cross-Site Scripting)
+       Pattern : balises script, event handlers JS dans l'URI
+       Niveau 9 : attaque probable
+  ======================================================================= -->
+  <rule id="100012" level="9">
+    <if_sid>100010</if_sid>
+    <url_match>(?i)(%3Cscript|&lt;script|\bjavascript:|onerror=|onload=|onclick=|alert\s*\(|document\.cookie|\.innerHTML|eval\s*\(|%3Csvg|%3Cimg)</url_match>
+    <description>SecureApp : TENTATIVE XSS détectée depuis $(data.remote_addr) — URI : $(data.uri)</description>
+    <group>xss,pci_dss_6.5.7,web_attack</group>
+    <mitre>
+      <id>T1059.007</id>  <!-- MITRE ATT&CK : JavaScript -->
+    </mitre>
+  </rule>
+
+  <!-- ======================================================================
+       RÈGLE 100013 — Détection Path Traversal / LFI
+       Pattern : tentatives d'accès à des fichiers système via ../
+  ======================================================================= -->
+  <rule id="100013" level="9">
+    <if_sid>100010</if_sid>
+    <url_match>(?i)(\.\.\/|\.\.\\|%2e%2e%2f|%2e%2e\/|\/etc\/passwd|\/etc\/shadow|\/proc\/self|\.\.%2f)</url_match>
+    <description>SecureApp : TENTATIVE PATH TRAVERSAL depuis $(data.remote_addr) — URI : $(data.uri)</description>
+    <group>path_traversal,web_attack</group>
+    <mitre>
+      <id>T1083</id>  <!-- MITRE ATT&CK : File and Directory Discovery -->
+    </mitre>
+  </rule>
+
+  <!-- ======================================================================
+       RÈGLE 100014 — Erreur 429 (Rate Limit atteint par Nginx)
+       Niveau 7 : suspect, peut indiquer un scan ou attaque
+  ======================================================================= -->
+  <rule id="100014" level="7">
+    <if_sid>100010</if_sid>
+    <field name="data.status">429</field>
+    <description>SecureApp : rate limit Nginx atteint par $(data.remote_addr) sur $(data.uri)</description>
+    <group>rate_limiting,web_attack</group>
+  </rule>
+
+  <!-- ======================================================================
+       RÈGLE 100015 — SCAN DE PORTS / ÉNUMÉRATION WEB
+       Déclenchée si plus de 15 requêtes aboutissant à 404
+       depuis la même IP en 30 secondes.
+       Niveau 10 : attaque confirmée
+  ======================================================================= -->
+  <rule id="100015" level="10" frequency="15" timeframe="30">
+    <if_matched_sid>100010</if_matched_sid>
+    <field name="data.status">404</field>
+    <same-field name="data.remote_addr" />
+    <description>SecureApp : SCAN / ÉNUMÉRATION DÉTECTÉ — $(frequency) requêtes 404 depuis $(data.remote_addr) en 30s</description>
+    <group>web_scan,enumeration</group>
+    <mitre>
+      <id>T1595.003</id>  <!-- MITRE ATT&CK : Wordlist Scanning -->
+    </mitre>
+  </rule>
+
+  <!-- ======================================================================
+       RÈGLE 100016 — ATTAQUE EN MASSE (brute force HTTP)
+       Déclenchée si plus de 50 requêtes sur /auth/login
+       depuis la même IP en 60 secondes.
+       Niveau 12 : critique
+  ======================================================================= -->
+  <rule id="100016" level="12" frequency="50" timeframe="60">
+    <if_matched_sid>100010</if_matched_sid>
+    <url_match>/auth/login</url_match>
+    <same-field name="data.remote_addr" />
+    <description>SecureApp : ATTAQUE BRUTE FORCE HTTP — $(frequency) requêtes sur /auth/login depuis $(data.remote_addr)</description>
+    <group>brute_force,web_attack,pci_dss_11.4</group>
+    <mitre>
+      <id>T1110.001</id>  <!-- MITRE ATT&CK : Password Guessing -->
+    </mitre>
+  </rule>
+
+</group>

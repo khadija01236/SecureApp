@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Codes de secours — SecureApp{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card mt-4">
+      <div class="card-body p-4">
+        <h2 class="card-title mb-1">
+          <i class="bi bi-key-fill text-warning me-2"></i>Codes de secours
+        </h2>
+
+        {% if codes %}
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>Sauvegarde ces codes maintenant.</strong> Ils ne seront plus affichés.
+            Chaque code n'est utilisable qu'une seule fois.
+          </div>
+          <div class="bg-dark text-success font-monospace p-3 rounded mb-4">
+            {% for code in codes %}
+              <div class="mb-1">{{ code }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <p class="text-muted small mb-3">
+          Les codes de secours te permettent de te connecter si tu n'as plus accès à ton application
+          d'authentification. Génère de nouveaux codes pour invalider les anciens.
+        </p>
+
+        <form method="POST" action="{{ url_for('main.backup_codes') }}">
+          <div class="mb-3">
+            <label for="password" class="form-label">Mot de passe actuel</label>
+            <input
+              type="password"
+              class="form-control"
+              id="password"
+              name="password"
+              placeholder="Confirme ton mot de passe"
+              required
+              autocomplete="current-password"
+            />
+          </div>
+          <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-warning">
+              <i class="bi bi-arrow-repeat me-2"></i>Générer de nouveaux codes
+            </button>
+            <a href="{{ url_for('main.profile') }}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-1"></i>Retour au profil
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

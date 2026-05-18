@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Mon profil — SecureApp{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+  <div class="col">
+    <h2 class="fw-bold">
+      <i class="bi bi-person-circle text-primary me-2"></i>Mon profil
+    </h2>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Informations du compte -->
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-person me-2"></i>Informations</h5>
+      </div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-5">Nom d'utilisateur</dt>
+          <dd class="col-sm-7">{{ current_user.username }}</dd>
+          <dt class="col-sm-5">Email</dt>
+          <dd class="col-sm-7">{{ current_user.email }}</dd>
+          <dt class="col-sm-5">Inscription</dt>
+          <dd class="col-sm-7">{{ current_user.created_at.strftime('%d/%m/%Y') }}</dd>
+          <dt class="col-sm-5">Codes secours</dt>
+          <dd class="col-sm-7">
+            <span class="badge {% if backup_codes_remaining > 0 %}bg-success{% else %}bg-danger{% endif %}">
+              {{ backup_codes_remaining }} restant(s)
+            </span>
+          </dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gestion MFA -->
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Authentification multi-facteurs</h5>
+      </div>
+      <div class="card-body">
+
+        <!-- TOTP -->
+        <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-3">
+          <div>
+            <h6 class="mb-1"><i class="bi bi-phone me-1"></i>Application TOTP</h6>
+            <p class="text-muted small mb-0">
+              Google Authenticator, Authy, etc. Code à 6 chiffres renouvelé toutes les 30 secondes.
+            </p>
+          </div>
+          <div class="text-end ms-3">
+            {% if current_user.totp_enabled %}
+              <span class="badge bg-success mb-2 d-block">Activé</span>
+              <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#disableTotpModal">
+                Désactiver
+              </button>
+            {% else %}
+              <span class="badge bg-secondary mb-2 d-block">Désactivé</span>
+              <a href="{{ url_for('auth.mfa_setup') }}" class="btn btn-sm btn-outline-primary">
+                Configurer
+              </a>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Email OTP -->
+        <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-3">
+          <div>
+            <h6 class="mb-1"><i class="bi bi-envelope me-1"></i>Code par email</h6>
+            <p class="text-muted small mb-0">
+              Reçois un code à usage unique sur {{ current_user.email }}.
+            </p>
+          </div>
+          <div class="text-end ms-3">
+            {% if current_user.email_otp_enabled %}
+              <span class="badge bg-success mb-2 d-block">Activé</span>
+            {% else %}
+              <span class="badge bg-secondary mb-2 d-block">Désactivé</span>
+            {% endif %}
+            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#toggleEmailModal">
+              {% if current_user.email_otp_enabled %}Désactiver{% else %}Activer{% endif %}
+            </button>
+          </div>
+        </div>
+
+        <!-- Backup codes -->
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <h6 class="mb-1"><i class="bi bi-key me-1"></i>Codes de secours</h6>
+            <p class="text-muted small mb-0">
+              Codes à usage unique en cas de perte d'accès à tes méthodes MFA.
+              <strong>{{ backup_codes_remaining }}</strong> code(s) restant(s).
+            </p>
+          </div>
+          <div class="ms-3">
+            <a href="{{ url_for('main.backup_codes') }}" class="btn btn-sm btn-outline-warning">
+              Générer
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal désactiver TOTP -->
+<div class="modal fade" id="disableTotpModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('main.disable_totp') }}">
+        <div class="modal-header">
+          <h5 class="modal-title text-danger">
+            <i class="bi bi-exclamation-triangle me-2"></i>Désactiver le TOTP
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Confirme ton mot de passe pour désactiver l'authentification TOTP.</p>
+          <input
+            type="password"
+            class="form-control"
+            name="password"
+            placeholder="Mot de passe"
+            required
+            autocomplete="current-password"
+          />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="submit" class="btn btn-danger">Désactiver</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal toggle Email OTP -->
+<div class="modal fade" id="toggleEmailModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('main.toggle_email_otp') }}">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-envelope me-2"></i>
+            {% if current_user.email_otp_enabled %}Désactiver{% else %}Activer{% endif %} l'OTP par email
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Confirme ton mot de passe pour modifier ce paramètre.</p>
+          <input
+            type="password"
+            class="form-control"
+            name="password"
+            placeholder="Mot de passe"
+            required
+            autocomplete="current-password"
+          />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="submit" class="btn btn-primary">Confirmer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

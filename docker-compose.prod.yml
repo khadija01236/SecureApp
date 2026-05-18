@@ -1,0 +1,98 @@
+version: "3.9"
+
+# =============================================================================
+# SecureApp — Stack de PRODUCTION
+#
+# Prérequis :
+#   1. Remplir .env (cp .env.example .env) et définir les vraies valeurs
+#   2. Lancer : docker compose -f docker-compose.prod.yml up -d
+#
+# Différences vs dev :
+#   - Gunicorn (pas de flask run --debug)
+#   - Aucun volume de code source (pas de hot-reload)
+#   - Port PostgreSQL non exposé à l'hôte
+#   - MailHog remplacé par SMTP externe (configurer via .env)
+#   - Tous les secrets viennent exclusivement du .env
+#   - flask db upgrade automatique au démarrage via entrypoint.sh
+# =============================================================================
+
+services:
+
+  # ── Reverse proxy Nginx (HTTP→HTTPS) ──────────────────────────────────────
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: nginx_proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - nginx_logs:/var/log/nginx
+      - nginx_blocked_ips:/etc/nginx/wazuh
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  # ── Application Flask (Gunicorn) ──────────────────────────────────────────
+  web:
+    build: .
+    container_name: flask_app
+    restart: unless-stopped
+    expose:
+      - "5000"
+    env_file:
+      - .env
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    volumes:
+      - flask_logs:/var/log/flask
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - app_network
+
+  # ── Base de données PostgreSQL ─────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Port 5432 NON exposé à l'hôte en production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+volumes:
+  postgres_data:
+  flask_logs:
+    name: flask_logs
+  nginx_logs:
+    name: nginx_logs
+  nginx_blocked_ips:
+    name: nginx_blocked_ips
+
+networks:
+  app_network:
+    driver: bridge
+    name: secureapp_network
