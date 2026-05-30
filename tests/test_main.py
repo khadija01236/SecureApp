@@ -50,11 +50,10 @@ class TestDisableTotp:
         assert "incorrect" in resp.data.decode()
 
     def test_success(self, logged_in_client, user, app):
-        with app.app_context():
-            u = User.query.get(user)
-            u.totp_secret = pyotp.random_base32()
-            u.totp_enabled = True
-            db.session.commit()
+        u = db.session.get(User, user)
+        u.totp_secret = pyotp.random_base32()
+        u.totp_enabled = True
+        db.session.commit()
 
         resp = logged_in_client.post(
             "/profile/mfa/totp/disable",
@@ -63,10 +62,10 @@ class TestDisableTotp:
         )
         assert "désactivée" in resp.data.decode()
 
-        with app.app_context():
-            u = User.query.get(user)
-            assert not u.totp_enabled
-            assert u.totp_secret is None
+        db.session.expire_all()
+        u = db.session.get(User, user)
+        assert not u.totp_enabled
+        assert u.totp_secret is None
 
 
 # ---------------------------------------------------------------------------

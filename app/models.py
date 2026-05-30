@@ -52,7 +52,10 @@ class User(UserMixin, db.Model):
     def is_locked(self):
         if self.locked_until is None:
             return False
-        return datetime.now(timezone.utc) < self.locked_until
+        locked = self.locked_until
+        if locked.tzinfo is None:
+            locked = locked.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) < locked
 
     def increment_failed_attempts(self):
         from datetime import timedelta

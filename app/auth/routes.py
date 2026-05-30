@@ -227,10 +227,13 @@ def mfa_verify():
             verified = totp.verify(code, valid_window=1)
 
         elif method == "email" and user.email_otp_enabled:
+            expires_at = user.email_otp_expires_at
+            if expires_at is not None and expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
             if (
                 user.email_otp_code
-                and user.email_otp_expires_at
-                and datetime.now(timezone.utc) < user.email_otp_expires_at
+                and expires_at
+                and datetime.now(timezone.utc) < expires_at
                 and user.email_otp_code == code
             ):
                 verified = True

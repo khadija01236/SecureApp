@@ -7,3 +7,5 @@ venv/
 *.egg-info/
 .pytest_cache/
 instance/
+CLAUDE.md
+

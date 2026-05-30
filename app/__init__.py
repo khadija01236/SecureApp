@@ -26,7 +26,7 @@ login_manager.login_message = "Connecte-toi pour accéder à cette page."
 login_manager.login_message_category = "warning"
 
 
-def create_app():
+def create_app(test_config=None):
     app = Flask(__name__)
 
     # Faire confiance au proxy Nginx (X-Real-IP, X-Forwarded-For, X-Forwarded-Proto)
@@ -37,6 +37,9 @@ def create_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["MFA_ISSUER"] = os.getenv("MFA_ISSUER", "SecureApp")
+
+    if test_config:
+        app.config.update(test_config)
 
     # Flask-Mail
     app.config["MAIL_SERVER"] = os.getenv("MAIL_SERVER", "mailhog")

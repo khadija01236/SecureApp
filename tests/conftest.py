@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 import pytest
 
 from app import create_app, db as _db
@@ -6,20 +9,25 @@ from app.models import User
 
 @pytest.fixture
 def app():
-    """App Flask configurée pour les tests : SQLite en mémoire, mail supprimé, rate limit désactivé."""
-    test_app = create_app()
-    test_app.config.update(
-        {
-            "TESTING": True,
-            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-            "MAIL_SUPPRESS_SEND": True,
-            "RATELIMIT_ENABLED": False,
-            "SECRET_KEY": "test-secret-key",
-        }
-    )
+    """App Flask configurée pour les tests : fichier SQLite temporaire, mail supprimé, rate limit désactivé."""
+    db_fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(db_fd)
+
+    test_app = create_app({
+        "TESTING": True,
+        "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_path}",
+        "MAIL_SUPPRESS_SEND": True,
+        "RATELIMIT_ENABLED": False,
+        "SECRET_KEY": "test-secret-key",
+    })
     with test_app.app_context():
         _db.create_all()
         yield test_app
+        _db.drop_all()
+        _db.session.remove()
+        _db.engine.dispose()
+
+    os.unlink(db_path)
 
 
 @pytest.fixture
