@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
+      - name: Create log directory
+        run: sudo mkdir -p /var/log/flask && sudo chmod 777 /var/log/flask
+
       - name: Run tests
         run: pytest tests/ -v --tb=short
         env:
