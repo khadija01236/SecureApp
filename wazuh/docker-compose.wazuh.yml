@@ -123,10 +123,12 @@ services:
       - API_USERNAME=wazuh-wui
       - API_PASSWORD=MyS3cr37P450r.*-
     volumes:
-      # Certificats TLS
-      - ./certs/wazuh-dashboard.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard.pem
-      - ./certs/wazuh-dashboard-key.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard.key
-      - ./certs/root-ca.pem:/usr/share/wazuh-dashboard/certs/root-ca.pem
+      # Config custom qui pointe les certs vers le dossier writable de l'image
+      - ./config/opensearch_dashboards.yml:/usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
+      # Certificats dans le sous-dossier config/certs/ (writable, existe dans l'image)
+      - ./certs/wazuh-dashboard.pem:/usr/share/wazuh-dashboard/config/certs/dashboard.pem
+      - ./certs/wazuh-dashboard-key.pem:/usr/share/wazuh-dashboard/config/certs/dashboard-key.pem
+      - ./certs/root-ca.pem:/usr/share/wazuh-dashboard/config/certs/root-ca.pem
     depends_on:
       - wazuh-indexer
       - wazuh-manager
