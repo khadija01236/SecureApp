@@ -53,6 +53,7 @@ def _log_event(event_type, user=None, details=None):
             "event_type": event_type,
             "user": user.username if user else "anonymous",
             "ip": ip,
+            "srcip": ip,
             "user_agent": ua,
             "details": details,
         },
@@ -211,7 +212,7 @@ def mfa_verify():
     if not user_id:
         return redirect(url_for("auth.login"))
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         session.pop("mfa_user_id", None)
         return redirect(url_for("auth.login"))
@@ -277,7 +278,7 @@ def mfa_email_send():
     if not user_id:
         return redirect(url_for("auth.login"))
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if user and user.email_otp_enabled:
         _send_email_otp(user)
         flash("Un nouveau code a été envoyé à ton adresse email.", "info")
@@ -398,6 +399,7 @@ def forgot_password():
                     "event_type": "password_reset_request",
                     "user": user.username,
                     "ip": request.remote_addr,
+                    "srcip": request.remote_addr,
                     "user_agent": request.user_agent.string[:256],
                     "details": None,
                 },

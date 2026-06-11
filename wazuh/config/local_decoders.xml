@@ -1,48 +1,18 @@
 <!--
-  Décodeurs custom pour les logs JSON de Flask (SecureApp)
+  Décodeurs custom pour les logs JSON de Flask et Nginx (SecureApp)
 
-  Format des logs Flask produits par app/__init__.py :
-  {
-    "timestamp": "2026-03-23T14:32:01",
-    "level": "INFO",
-    "logger": "app.auth.routes",
-    "message": "auth_event",
-    "event_type": "login_fail",
-    "user": "alice",
-    "ip": "192.168.1.10",
-    "user_agent": "Mozilla/5.0...",
-    "details": "identifier=alice"
-  }
-
-  Wazuh parse automatiquement le JSON via log_format=json dans ossec.conf.
-  Les champs deviennent accessibles comme data.event_type, data.user, data.ip, etc.
-  Ces décodeurs affinent l'identification de la source.
+  Avec log_format=json dans ossec.conf, Wazuh parse automatiquement tous les
+  champs JSON et les rend accessibles comme data.event_type, data.user, data.ip, etc.
+  Ces décodeurs servent uniquement à nommer la source (decoded_as) pour les règles.
 -->
 
+<!-- Décodeurs nommés pour les logs Flask et Nginx (SecureApp)
+     Avec log_format=json, le décodeur built-in "json" est utilisé.
+     Ces décodeurs permettent de nommer la source dans les alertes. -->
 <decoder name="flask-secureapp">
-  <!-- Identifie les logs provenant de Flask via le label "source" -->
-  <prematch>\"source\":\"flask\"</prematch>
-</decoder>
-
-<decoder name="flask-secureapp-auth">
-  <!-- Décodeur enfant : extrait les champs d'authentification -->
-  <parent>flask-secureapp</parent>
-  <prematch>\"event_type\":</prematch>
-  <!-- Capture : event_type, user, ip -->
-  <regex>"event_type":"(\.+?)","[^"]*":"[^"]*","[^"]*":"[^"]*","[^"]*":"[^"]*","user":"(\.+?)","ip":"(\d+\.\d+\.\d+\.\d+)"</regex>
-  <order>extra_data, srcuser, srcip</order>
+  <prematch>"event_type"</prematch>
 </decoder>
 
 <decoder name="nginx-secureapp">
-  <!-- Identifie les logs provenant de Nginx via le label "source" -->
-  <prematch>\"source\":\"nginx\"</prematch>
-</decoder>
-
-<decoder name="nginx-secureapp-request">
-  <!-- Décodeur enfant : extrait les champs de la requête HTTP -->
-  <parent>nginx-secureapp</parent>
-  <prematch>\"remote_addr\":</prematch>
-  <!-- Capture : remote_addr, method, uri, status -->
-  <regex>"remote_addr":"(\d+\.\d+\.\d+\.\d+)","method":"(\w+)","uri":"([^"]+)","status":(\d+)</regex>
-  <order>srcip, protocol, url, id</order>
+  <prematch>"remote_addr"</prematch>
 </decoder>

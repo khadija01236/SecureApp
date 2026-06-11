@@ -32,13 +32,11 @@ services:
     environment:
       - INDEXER_URL=https://wazuh-indexer:9200
       - INDEXER_USERNAME=admin
-      - INDEXER_PASSWORD=SecretPassword
+      - INDEXER_PASSWORD=admin
       - FILEBEAT_SSL_VERIFICATION_MODE=full
       - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
       - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
       - SSL_KEY=/etc/ssl/filebeat.key
-      - API_USERNAME=wazuh-wui
-      - API_PASSWORD=MyS3cr37P450r.*-
     volumes:
       # Données persistantes Wazuh
       - wazuh_api_configuration:/var/ossec/api/configuration
@@ -56,18 +54,10 @@ services:
       - ./certs/root-ca-manager.pem:/etc/ssl/root-ca.pem
       - ./certs/wazuh-manager.pem:/etc/ssl/filebeat.pem
       - ./certs/wazuh-manager-key.pem:/etc/ssl/filebeat.key
-      # Configuration custom (ossec.conf)
-      - ./config/ossec.conf:/wazuh-config-mount/etc/ossec.conf
-      # Règles et décodeurs custom
-      - ./rules/local_rules.xml:/var/ossec/etc/rules/local_rules.xml
-      - ./config/local_decoders.xml:/var/ossec/etc/decoders/local_decoder.xml
       # Logs applicatifs Flask et Nginx (volumes partagés depuis compose principal)
       - flask_logs:/var/log/flask:ro
       - nginx_logs:/var/log/nginx:ro
-      # Script active response custom (nginx-block.sh)
-      - ./active-response/nginx-block.sh:/var/ossec/active-response/bin/nginx-block.sh
       # Répertoire de deny list Nginx — partagé avec le conteneur Nginx
-      # Le script écrit dans /etc/nginx/wazuh/blocked_ips.conf
       - nginx_blocked_ips:/etc/nginx/wazuh
       # Socket Docker — permet à nginx-block.sh de recharger Nginx via SIGHUP
       - /var/run/docker.sock:/var/run/docker.sock
@@ -114,14 +104,16 @@ services:
     hostname: wazuh-dashboard
     restart: unless-stopped
     ports:
-      - "5601:5601"
+      - "5601:443"
     environment:
       - OPENSEARCH_HOSTS=https://wazuh-indexer:9200
       - WAZUH_API_URL=https://wazuh-manager
+      - WAZUH_API_PORT=55000
       - DASHBOARD_USERNAME=kibanaserver
       - DASHBOARD_PASSWORD=kibanaserver
       - API_USERNAME=wazuh-wui
-      - API_PASSWORD=MyS3cr37P450r.*-
+      - API_PASSWORD=wazuh-wui
+      - NODE_EXTRA_CA_CERTS=/usr/share/wazuh-dashboard/config/certs/root-ca.pem
     volumes:
       # Config custom qui pointe les certs vers le dossier writable de l'image
       - ./config/opensearch_dashboards.yml:/usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
@@ -142,11 +134,11 @@ volumes:
   # Volumes internes Wazuh manager
   wazuh_api_configuration:
   wazuh_etc:
+  wazuh_active_response:
   wazuh_logs:
   wazuh_queue:
   wazuh_var_multigroups:
   wazuh_integrations:
-  wazuh_active_response:
   wazuh_agentless:
   wazuh_wodles:
   filebeat_etc:

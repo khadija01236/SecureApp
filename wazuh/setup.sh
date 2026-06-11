@@ -108,6 +108,7 @@ else
     sign_cert "wazuh-indexer"   "wazuh-indexer"
     sign_cert "wazuh-manager"   "wazuh-manager"
     sign_cert "wazuh-dashboard" "wazuh-dashboard"
+    sign_cert "wazuh-api"       "wazuh-manager"
 
     # 644 : lisible par tous (nécessaire pour OpenSearch/Java dans le conteneur)
     chmod 644 "${CERTS_DIR}"/*.pem 2>/dev/null || true
