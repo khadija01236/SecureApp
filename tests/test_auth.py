@@ -148,7 +148,7 @@ class TestLogin:
             data={"identifier": "testuser", "password": "wrong"},
         )
         with app.app_context():
-            assert User.query.get(user).failed_login_attempts == 1
+            assert db.session.get(User, user).failed_login_attempts == 1
 
     def test_lockout_after_10_failures(self, client, user, app):
         for _ in range(10):
@@ -157,11 +157,11 @@ class TestLogin:
                 data={"identifier": "testuser", "password": "wrong"},
             )
         with app.app_context():
-            assert User.query.get(user).is_locked()
+            assert db.session.get(User, user).is_locked()
 
     def test_locked_account_shows_message(self, client, user, app):
         with app.app_context():
-            u = User.query.get(user)
+            u = db.session.get(User, user)
             u.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
             db.session.commit()
         resp = client.post(
@@ -182,7 +182,7 @@ class TestLogin:
             follow_redirects=True,
         )
         with app.app_context():
-            assert User.query.get(user).failed_login_attempts == 0
+            assert db.session.get(User, user).failed_login_attempts == 0
 
 
 # ---------------------------------------------------------------------------

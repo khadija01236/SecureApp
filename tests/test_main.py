@@ -89,7 +89,7 @@ class TestToggleEmailOtp:
             follow_redirects=True,
         )
         with app.app_context():
-            assert User.query.get(user).email_otp_enabled is True
+            assert db.session.get(User, user).email_otp_enabled is True
 
     def test_toggle_twice_disables(self, logged_in_client, user, app):
         for _ in range(2):
@@ -99,7 +99,7 @@ class TestToggleEmailOtp:
                 follow_redirects=True,
             )
         with app.app_context():
-            assert User.query.get(user).email_otp_enabled is False
+            assert db.session.get(User, user).email_otp_enabled is False
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ class TestBackupCodes:
             follow_redirects=True,
         )
         with app.app_context():
-            assert User.query.get(user).get_backup_codes_remaining() == 8
+            assert db.session.get(User, user).get_backup_codes_remaining() == 8
 
     def test_generate_replaces_old_codes(self, logged_in_client, user, app):
         for _ in range(2):
@@ -137,4 +137,4 @@ class TestBackupCodes:
                 follow_redirects=True,
             )
         with app.app_context():
-            assert User.query.get(user).get_backup_codes_remaining() == 8
+            assert db.session.get(User, user).get_backup_codes_remaining() == 8

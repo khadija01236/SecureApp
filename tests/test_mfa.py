@@ -82,14 +82,14 @@ class TestMFAVerify:
             data={"code": "000000", "method": "totp"},
         )
         with app.app_context():
-            assert User.query.get(user_id).failed_login_attempts == 1
+            assert db.session.get(User, user_id).failed_login_attempts == 1
 
     def test_email_otp_success(self, client, email_otp_user, app):
         with client.session_transaction() as sess:
             sess["mfa_user_id"] = email_otp_user
 
         with app.app_context():
-            u = User.query.get(email_otp_user)
+            u = db.session.get(User, email_otp_user)
             u.email_otp_code = "123456"
             u.email_otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
             db.session.commit()
@@ -106,7 +106,7 @@ class TestMFAVerify:
             sess["mfa_user_id"] = email_otp_user
 
         with app.app_context():
-            u = User.query.get(email_otp_user)
+            u = db.session.get(User, email_otp_user)
             u.email_otp_code = "123456"
             u.email_otp_expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
             db.session.commit()
@@ -123,7 +123,7 @@ class TestMFAVerify:
             sess["mfa_user_id"] = email_otp_user
 
         with app.app_context():
-            u = User.query.get(email_otp_user)
+            u = db.session.get(User, email_otp_user)
             u.email_otp_code = "654321"
             u.email_otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
             db.session.commit()
@@ -134,7 +134,7 @@ class TestMFAVerify:
             follow_redirects=True,
         )
         with app.app_context():
-            u = User.query.get(email_otp_user)
+            u = db.session.get(User, email_otp_user)
             assert u.email_otp_code is None
 
     def test_backup_code_success(self, client, app):
@@ -180,7 +180,7 @@ class TestMFAVerify:
             follow_redirects=True,
         )
         with app.app_context():
-            assert User.query.get(user_id).get_backup_codes_remaining() == 7
+            assert db.session.get(User, user_id).get_backup_codes_remaining() == 7
 
 
 # ---------------------------------------------------------------------------
@@ -210,7 +210,7 @@ class TestMFASetup:
         assert "activée" in resp.data.decode()
 
         with app.app_context():
-            assert User.query.get(user).totp_enabled
+            assert db.session.get(User, user).totp_enabled
 
     def test_setup_wrong_code(self, logged_in_client):
         logged_in_client.get("/auth/mfa/setup")

@@ -72,7 +72,7 @@ class TestResetPassword:
             data={"password": "newpassword123", "confirm_password": "newpassword123"},
         )
         with app.app_context():
-            u = User.query.get(user)
+            u = db.session.get(User, user)
             assert u.check_password("newpassword123")
             assert not u.check_password("password123")
 
@@ -81,7 +81,7 @@ class TestResetPassword:
         from datetime import datetime, timedelta, timezone
 
         with app.app_context():
-            u = User.query.get(user)
+            u = db.session.get(User, user)
             u.failed_login_attempts = 10
             u.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
             db.session.commit()
@@ -92,7 +92,7 @@ class TestResetPassword:
             data={"password": "newpassword123", "confirm_password": "newpassword123"},
         )
         with app.app_context():
-            u = User.query.get(user)
+            u = db.session.get(User, user)
             assert u.failed_login_attempts == 0
             assert not u.is_locked()
 
