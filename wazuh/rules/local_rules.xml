@@ -214,14 +214,24 @@
   </rule>
 
   <!-- ======================================================================
+       RÈGLE 100018 — Requête Nginx sur /auth/login (intermédiaire level-3)
+       Même raison que 100017 : if_matched_sid ne compte pas les level-0.
+  ======================================================================= -->
+  <rule id="100018" level="3">
+    <if_sid>100010</if_sid>
+    <field name="uri">^/auth/login</field>
+    <description>SecureApp Nginx : requête sur /auth/login depuis $(remote_addr)</description>
+    <group>web_auth</group>
+  </rule>
+
+  <!-- ======================================================================
        RÈGLE 100016 — ATTAQUE EN MASSE (brute force HTTP)
        Déclenchée si plus de 50 requêtes sur /auth/login
        depuis la même IP en 60 secondes.
        Niveau 12 : critique
   ======================================================================= -->
   <rule id="100016" level="12" frequency="50" timeframe="60">
-    <if_matched_sid>100010</if_matched_sid>
-    <field name="uri">^/auth/login</field>
+    <if_matched_sid>100018</if_matched_sid>
     <same_field>remote_addr</same_field>
     <description>SecureApp : ATTAQUE BRUTE FORCE HTTP — $(frequency) requêtes sur /auth/login depuis $(remote_addr)</description>
     <group>brute_force,web_attack,pci_dss_11.4</group>
