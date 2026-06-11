@@ -1,3 +1,4 @@
+# Python
 .env
 __pycache__/
 *.pyc
@@ -7,5 +8,12 @@ venv/
 *.egg-info/
 .pytest_cache/
 instance/
+
+# Wazuh — clés privées et fichiers intermédiaires (ne jamais commiter)
+wazuh/certs/*-key.pem
+wazuh/certs/*.csr
+wazuh/certs/root-ca.srl
+
+# Claude Code
 CLAUDE.md
 
