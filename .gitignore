@@ -16,4 +16,7 @@ wazuh/certs/root-ca.srl
 
 # Claude Code
 CLAUDE.md
+.claude/
+*.claude
+claude.md
 
